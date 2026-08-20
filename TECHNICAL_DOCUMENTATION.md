@@ -13,7 +13,9 @@ Initially, the project explored predicting the exact `track_popularity` score (a
 1.  **Subjectivity and Noise:** A song's popularity score on Spotify is an algorithmic metric influenced by many transient factors. A score of 65 vs. 68 has little meaningful difference and can be subject to noise, making precise prediction difficult and potentially misleading.
 2.  **Lack of Business Actionability:** For a record label, the key decision is categorical: "Is this a guaranteed hit, an average track, or a flop?" A predicted continuous score of 55 doesn't provide a clear, actionable answer.
 
-To better align with the business need, the problem was reframed as a **multi-class classification** task. The target variable was clustered via K-Means into three distinct tiers: Flops (Class 0), Average (Class 1), and Hits (Class 2). This framing provides a direct, interpretable, and actionable output for stakeholders, allowing the business to isolate and target the top-tier "Hits" while remaining robust to the inherent noise in popularity metrics.
+To better align with the business need, the problem was reframed as a **multi-class classification** task. The target variable was clustered via **K-Means** into 3 distinct tiers: Flops (Class 0), Average (Class 1), and Hits (Class 2). This framing provides a direct, interpretable, and actionable output for stakeholders, allowing the business to isolate and target the top-tier "Hits" while remaining robust to the inherent noise in popularity metrics.
+
+![Kmeans popularity classes](Images/Kmeans_popularity_classes.png)
 
 ---
 
@@ -54,9 +56,13 @@ A careful, multi-faceted strategy was employed for categorical features based on
         -   **Target Mean Encoding:** Captures the average popularity for each subgenre.
         -   **Target Std Encoding:** Captures the standard deviation of popularity for each subgenre. This is crucial for tree-based models, as it allows them to learn how "reliable" the mean encoding is. A high STD signals that the subgenre is noisy and the model should weigh it less.
 
+    ![playlist subgenre target encoding](Images/playlist_subgenre_target_encoding.png)
+
 -   **Very High-Cardinality Features (`track_artist`, `track_album_id`):**
     -   **Rationale:** These features exhibit a long-tail distribution, where most artists and albums appear only once. Applying target encoding directly to these features would be equivalent to leaking the target variable into the model, leading to **severe overfitting**. The model would simply memorize that a specific song from the training set was a hit, rather than learning generalizable patterns.
     -   **Decision:** To avoid this critical pitfall, a deliberate choice was made to **EXCLUDE** target encoding for `track_artist` and `track_album_id`. Instead, these features were used to engineer higher-level "artist reach" aggregations, which proved far more robust (e.g., `artist_total_playlists`, `artist_total_genres`).
+
+    ![artist total subgenres](Images/artist_total_subgenres.png)
 
 ---
 
@@ -70,19 +76,17 @@ The analysis of individual feature distributions revealed key patterns:
 -   **Skewed Distributions:** `track_age`, `acousticness`, and `liveness` were highly right-skewed, indicating a dataset dominated by newer, non-acoustic, studio-recorded tracks. `energy` and `loudness` were left-skewed.
 -   **Zero-Inflated:** `instrumentalness` was heavily concentrated at or near zero, confirming that most tracks contain vocals.
 
-*Placeholder for Univariate Analysis Visualizations:*
-`![Feature Distributions](images/univariate_histograms.png)`
+![Feature Distributions](Images/univariate_histograms.png)
 *(Caption: Distribution of key continuous audio features, highlighting skewness and central tendencies.)*
 
 ### 4.2. Bivariate and Correlation Analysis
 -   **Strong Correlations:** A strong positive correlation was observed between `energy` and `loudness` (0.68), which is intuitive. A notable negative correlation was found between `energy` and `acousticness` (-0.55).
 -   **Binned Analysis:** Although linear correlations with the target were weak, binning continuous features into quantiles and plotting the mean popularity revealed clear monotonic and non-linear trends. For instance, `danceability` and `energy` showed a positive trend with popularity.
 
-*Placeholder for Bivariate Analysis Visualizations:*
-`![Correlation Heatmap](images/correlation_heatmap.png)`
+![Correlation Heatmap](Images/correlation_heatmap_continuous_features.png)
 *(Caption: Heatmap showing Pearson correlations between continuous features.)*
 
-`![Binned Popularity Trends](images/binned_popularity.png)`
+![Binned Popularity Trends](Images/energy_binned_popularity.png)
 *(Caption: Mean track popularity across quantiles of continuous features, revealing non-linear relationships.)*
 
 ---
@@ -105,14 +109,7 @@ A suite of models was trained to evaluate different approaches to the classifica
 ### 6.2. Holistic Evaluation
 The initial models were evaluated using `f1_macro` to ensure balanced performance across all three classes (Flop, Average, Hit). The XGBoost Classifier significantly outperformed the others, establishing it as the best candidate for the final production model.
 
-*Placeholder for Modeling and Evaluation Visualizations:*
-`![Model Performance Comparison](images/model_comparison.png)`
-*(Caption: Bar chart comparing key evaluation metrics (e.g., Precision, Recall, F1-Score) across all trained models.)*
-
-`![XGBoost ROC-AUC Curve](images/roc_auc_curve.png)`
-*(Caption: ROC-AUC curve for the final XGBoost model, demonstrating its discriminative power.)*
-
-`![Feature Importance Plot](images/feature_importance.png)`
+![Feature Importance Plot](Images/feature_importance_XGBoostClassifier.png)
 *(Caption: SHAP or permutation feature importance plot for the final model, highlighting the top predictors of a hit song.)*
 
 ---
@@ -124,16 +121,13 @@ After establishing XGBoost as the superior algorithm, the focus shifts from gene
 ### 7.1. Threshold Optimization for Precision
 A standard classifier uses a default probability threshold, but this is rarely optimal for a specific business need. To maximize the precision of identifying Class 2 "Hits", we analyzed the **Precision-Recall Curve** using **Out-Of-Fold (OOF)** predictions. This technique prevented data leakage by generating unbiased probabilities on the training set. This allowed us to find the ideal probability threshold that correctly identifies a high percentage of true hits while strictly minimizing the number of false positives.
 
-*Placeholder for Precision-Recall Curve:*
-`![Precision-Recall Curve for Thresholding](images/precision_recall_curve.png)`
+![Precision-Recall Curve for Thresholding](Images/precision_recall_curve.png)
 *(Caption: Precision-Recall curve used to identify the optimal probability threshold for maximizing the precision of "Hit" predictions.)*
 
 ### 7.2. Final Model Performance
 Using the optimized thresholds, the final XGBoost model was evaluated on the unseen test set. The results demonstrate a model that is not only statistically robust but also aligned with the core business objective of confidently identifying commercially successful tracks.
 
-*Placeholder for Final Confusion Matrix:*
-`![Optimized Confusion Matrix](images/optimized_confusion_matrix.png)`
-*(Caption: Confusion matrix for the test set using the optimized threshold, highlighting the model's high precision for Class 2.)*
+![Test set buisness report](Images/test_set_buisness_report.png)
 
 ---
 
